@@ -44,10 +44,13 @@ class Chicken
             }
 
             age = _c.age;
-            int len = strlen(_c.name) + 1;
-            name = new char[len];
-            for (int i = 0; i < len; i++)
-                name[i] = _c.name[i];
+            if(_c.name != nullptr){
+                int len = strlen(_c.name) + 1;
+                name = new char[len];
+                for (int i = 0; i < len; i++)
+                    name[i] = _c.name[i];
+            }
+            
             return *this;
         };
 
