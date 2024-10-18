@@ -1,0 +1,446 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{geometry, CJKutf8}
+\geometry{margin=1.5cm, vmargin={0pt,1cm}}
+\setlength{\topmargin}{-1cm}
+\setlength{\paperheight}{29.7cm}
+\setlength{\textheight}{25.3cm}
+
+% useful packages.
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings,xcolor}
+\usepackage{float, caption}
+
+\lstset{
+    basicstyle=\ttfamily, basewidth=0.5em
+}
+
+% some common command
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle#1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif#1}{\dif#2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\begin{document}
+
+\pagestyle{fancy}
+\fancyhead{}
+\lhead{周妍祯, 3210103986}
+\chead{数据结构与算法第四次作业}
+\rhead{Oct.18th, 2024}
+
+\section{测试程序的设计思路}
+我在 main 函数中调用了多个函数来测试不同的功能，如果这些函数均能正常运行，
+则会在最后输出 "All tests passed!". 接下来我将依次介绍每一个函数实现了什么。
+
+\subsection{测试默认构造函数 -- testDefaultConstructor}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testDefaultConstructor() {
+        List<int> list;
+        assert(list.size() == 0);
+        assert(list.empty());
+        list.printList();   // expect empty line
+    }
+\end{lstlisting}
+
+我初始化了一个空链表 list，不进行任何的赋值，利用 `assert` 来测试该列表的size是否为0，
+以及该列表是否为空，最后打印出这个列表，预期得到一个空行。
+
+\subsection{测试初始化列表构造函数 -- testInitializerListConstructor}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testInitializerListConstructor() {
+        List<int> list = {1, 2, 3, 4, 5};
+        assert(list.size() == 5);
+        assert(*(list.begin()) == 1 && *(--list.end()) == 5);
+        list.printList();   // expect: 1 2 3 4 5
+    }
+\end{lstlisting}
+
+我利用初始化列表构造了一个列表 list，其中放了 5 个值(1 2 3 4 5)，
+利用 `assert` 来测试该列表的 size 是否为 5，以及该列表的第一个元素和最后一个元素是否为 1 和 5，最后打印出这个列表。
+
+\subsection{测试拷贝构造函数 -- testCopyConstructor}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testCopyConstructor() {
+        List<int> list1 = {1, 2, 3, 4, 5};
+        List<int> list2(list1);
+        assert(list2.size() == 5);
+        assert(*list2.begin() == 1 && *(--list2.end()) == 5);
+        list1.printList();  // expect: 1 2 3 4 5
+        list2.printList();  // expect: 1 2 3 4 5
+    }
+\end{lstlisting}
+
+我首先用初始化列表构造了 list1，其中存放了 5 个值(1 2 3 4 5)，然后使用拷贝构造函数将 list1 拷贝到 list2 中。
+为了测试两者是否相同，我使用了 `assert` 来测试 list2 的 size 是否为 5，以及第一个元素和最后一个元素是否为 1 和 5。
+最后将 list1 和 list2 都打印出来，看是否相等。
+
+\subsection{测试移动构造函数 -- testMoveConstructor}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testMoveConstructor() {
+        List<std::string> list1 = {"one", "two", "three"};
+        List<std::string> list2(std::move(list1));
+        assert(list1.size() == 0);
+        assert(list2.size() == 3);
+        assert(*list2.begin() == "one" && *(--list2.end()) == "three");
+        list2.printList();  // expect: one two three
+    }
+\end{lstlisting}
+
+我首先用初始化列表构造了 list1，其中存放了3个值("one" "two" "three")，然后使用移动构造函数将 list1 中的内容全部移动到 list2 中。
+为了测试两者是否相同，使用 `assert` 来测试list2的size是否为3，以及第一个元素和最后一个元素是否为"one"和"three"。
+最后我只打印了 list2，移动后尝试访问 list1 将导致程序崩溃，因为 head 和 tail 都被指向 nullptr 而不是一个有效的节点。
+
+\subsection{测试赋值运算符 -- testAssignmentOperator}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testAssignmentOperator() {
+        List<int> list1 = {1, 2, 3, 4, 5};
+        List<int> list2;
+        list2 = list1;
+        assert(list2.size() == 5);
+        assert(*list2.begin() == 1 && *(--list2.end()) == 5);
+        list1.printList();  // expect: 1 2 3 4 5
+        list2.printList();  // expect: 1 2 3 4 5
+    }
+\end{lstlisting}
+
+我首先用初始化列表构造了 list1，其中存放了 5 个值(1 2 3 4 5)，然后初始化 list2，不进行任何的赋值，之后使用赋值运算符将 list1 拷贝到 list2 中。
+为了测试两者是否相同，我使用了 `assert` 来测试 list2 的 size 是否为 5，以及第一个元素和最后一个元素是否为 1 和 5。
+最后将 list1 和 list2 都打印出来，看是否相等。
+
+\subsection{测试移动赋值运算符 -- testMoveAssignmentOperator}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testMoveAssignmentOperator() {
+        List<std::string> list1 = {"one", "two", "three"};
+        List<std::string> list2;
+        list2 = std::move(list1);
+        assert(list1.size() == 0);
+        assert(list2.size() == 3);
+        assert(*list2.begin() == "one" && *(--list2.end()) == "three");
+        list2.printList();  // expect: one two three
+    }
+\end{lstlisting}
+
+我首先用初始化列表构造了 list1，其中存放了 3 个值("one" "two" "three")，然后初始化 list2，不进行任何的赋值，之后使用移动赋值运算符将 list1 中的内容移动到到 list2 中。
+为了测试移动操作是否正确，我使用了 `assert` 来测试 list1 和 list2 的 size 是否分别为 0 和 3，以及 list2 第一个元素和最后一个元素是否为 "one" 和 "three"。
+同样的，我最后只将 list2 打印出来，因为移动后 list1 的 head 和 tail 都被指向 nullptr 而不是一个有效的节点。
+
+\subsection{测试插入和删除函数 -- testInsertAndErase}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testInsertAndErase() {
+        List<int> list = {4, 5, 6};
+        
+        // 插入元素
+        list.insert(list.end(), 1);
+        list.insert(list.end(), 2);
+        list.insert(list.end(), 1 + 2); // 右值
+        assert(list.size() == 6);
+        assert(*list.begin() == 4 && *(--list.end()) == 3);
+        list.printList();   // expect: 4 5 6 1 2 3
+    
+        // 删除元素
+        list.erase(list.begin());
+        list.erase(list.begin());
+        list.erase(--list.end());
+        assert(list.size() == 3);
+        assert(*list.begin() == 6 && *(--list.end()) == 2);
+        list.printList();   // expect: 6 1 2
+    
+        // 再次插入元素
+        list.insert(list.begin(), 0 + 0);   // 右值
+        list.insert(++list.begin(), 7);
+        assert(list.size() == 5);
+        assert(*list.begin() == 0 && *(++list.begin()) == 7);
+        list.printList();   // expect: 0 7 6 1 2
+    
+        // 删除指定范围的数据节点
+        list.erase(++list.begin(), --list.end());
+        assert(list.size() == 2);
+        assert(*list.begin() == 0 && *(--list.end()) == 2);
+        list.printList();   // expect: 0 2
+    
+        // 清除所有元素
+        list.clear();
+        assert(list.size() == 0);
+        list.printList();   // expect empty line
+    }
+\end{lstlisting}
+
+我首先用初始化列表构造了 list，其中存放了 3 个值(4 5 6)。
+
+\begin{enumerate}
+    \item 测试 insert 函数在尾部插入数据：使用 insert 函数在 list 尾部依次插入 1 2 1+2，这里的 1 2 是左值，而 1+2 是右值，
+分别调用了 `iterator insert(iterator itr, const Object \&x)` 和 `iterator insert(iterator itr, Object \&\&x)`。
+为了测试插入操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 6，以及第一个元素和最后一个元素是否为 4 和 3。
+最后打印出这个列表。
+
+    \item 测试 erase 函数：使用 erase 函数删除 list 的前 2 个节点数据和最后 1 个节点数据，调用了 `iterator erase(iterator itr)` 函数。
+为了测试删除操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 3，以及第一个元素和最后一个元素是否为 6 和 2。
+最后打印出这个列表。
+
+    \item 测试 insert 函数在头部插入数据： 使用 insert 函数在 list 头部插入 0+0，之后在 list 第 2 个位置处插入 7. 
+为了测试插入操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 5，以及第一个元素和第二个元素是否为 0 和 7。
+最后打印出这个列表。
+
+    \item 测试 erase 删除指定范围：使用 erase 函数删除第二个元素至倒数第二个元素范围内的数据，最后应只剩下第一个和最后一个元素。
+这里调用了 `iterator erase(iterator from, iterator to)` 函数。
+为了测试删除操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 2，以及第一个元素和最后一个元素是否为 0 和 2。
+最后打印出这个列表。
+
+    \item 测试 clear 函数：使用 clear 函数清楚 list 的所有元素，这里调用了 `void clear()` 函数。
+为了测试清除操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 0，
+最后打印出这个列表，预期得到一个空行。
+\end{enumerate}
+
+\subsection{测试push和pop函数 -- testPushAndPop}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testPushAndPop() {
+        List<float> list = {0.1, 0.2, 0.3, 0.4};
+    
+        // 插入数据到list头部
+        list.push_front(-0.1);
+        list.push_front(1.0 - 1.2); // 右值
+        assert(list.size() == 6);
+        list.printList();   // expect: -0.2 -0.1 0.1 0.2 0.3 0.4
+    
+        // 插入数据到list尾部
+        list.push_back(0.5);
+        list.push_back(0.3 + 0.3);  // 右值
+        assert(list.size() == 8);
+        list.printList();   // expect: -0.2 -0.1 0.1 0.2 0.3 0.4 0.5 0.6
+    
+        // 删除第1个节点的数据
+        list.pop_front();
+        list.pop_front();
+        assert(list.size() == 6);
+        list.printList();   // expect: 0.1 0.2 0.3 0.4 0.5 0.6
+    
+        // 删除最后1个节点的数据
+        list.pop_back();
+        assert(list.size() == 5);
+        list.printList();   // expect: 0.1 0.2 0.3 0.4 0.5
+    }
+\end{lstlisting}
+
+我首先用初始化列表构造了 list，其中存放了 4 个值(0.1 0.2 0.3 0.4)。
+
+\begin{enumerate}
+    \item 测试 push\_front 函数：使用 push\_front 函数在 list 头部插入 -0.1 和 1.0 - 1.2，这里的 -0.1 是左值，而 1.0 - 1.2 是右值，
+分别调用了 `void push\_front(const Object \&x)` 和 `void push\_front(Object \&\&x)`。
+为了测试插入操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 6，并打印出这个列表。
+
+    \item 测试 push\_back 函数：使用 push\_back 函数在 list 尾部插入 0.5 和 0.3 + 0.3，这里的 0.5 是左值，而 0.3 + 0.3 是右值，
+分别调用了 `void push\_back(const Object \&x)` 和 `void push\_back(Object \&\&x)`。
+为了测试插入操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 8，并打印出这个列表。
+
+    \item 测试 pop\_front 函数：使用 pop\_front 函数删除 list 的前 2 个节点数据，调用了 `void pop\_front()` 函数。
+为了测试删除操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 6，并打印出这个列表。
+
+    \item 测试 pop\_back 函数：使用 pop\_back 函数删除 list 的最后一个节点数据，调用了 `void pop\_back()` 函数。
+为了测试删除操作是否正确，我使用了 `assert` 来测试 list 的 size 是否为 5，并打印出这个列表。
+\end{enumerate}
+
+\subsection{测试迭代器 -- testIterators}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testIterators() {
+        List<int> list = {1, 2, 3, 4, 5};
+    
+        // 测试 iterator
+        auto it = list.begin();
+        auto cit = list.begin();
+        assert(it == cit);
+        assert(*it == 1);
+        assert(*cit == 1);
+        ++it;
+        ++cit;
+        assert(*it == 2);
+        assert(*cit == 2);
+        --it;
+        --cit;
+        assert(it == cit);
+        assert(*it == 1);
+        assert(*cit == 1);
+    
+        // 测试 const_iterator
+        // 使用const_iterator遍历List
+        for (List<int>::const_iterator c_it = list.begin(); c_it != list.end(); ++c_it) {
+            std::cout << *c_it << " "; 
+        }
+        std::cout << std::endl;     // expect: 1 2 3 4 5
+        
+        // 使用const_iterator验证特定值
+        List<int>::const_iterator c_cit = --list.end();
+        for (int i = 5; i > 0; --i, --c_cit) {
+            assert(*c_cit == i); // 再次使用operator*来获取当前节点的数据
+        }
+    
+        // 测试返回值为 const 的情况
+        const List<int>& constList = list;
+        assert(constList.front() == 1);
+        assert(constList.back() == 5);
+    
+    }
+\end{lstlisting}
+
+在这部分测试中，我首先构造了一个包含整数 1 到 5 的链表 list。
+
+\begin{enumerate}
+    \item 测试 iterator 的功能：通过创建一个 iterator 对象 it 和一个 const\_iterator 对象 cit，
+我验证了它们是否可以正确访问各个节点的数据。
+我使用了 `operator*` 来获取当前节点的数据，并使用 `operator++` 和 `operator--` 来前后移动迭代器的位置，
+这里分别测试了前置递增和递减、后置递增和递减。
+我还测试了 `operator==` 来判断两个迭代器是否相等。
+
+    \item 测试 const\_iterator 的功能：通过使用 const\_iterator 遍历链表并打印每个节点的数据，
+我验证了 const\_iterator 是否可以正确地读取链表中的数据。此外，我还通过递减 const\_iterator 来访问链表的末尾元素，
+并使用 `operator*` 获取节点数据进行验证。
+
+    \item 测试 List 被声明为 const 的情况：测试其是否可以正常访问其元素。
+通过 `constList.front()` 和 `constList.back()` 的调用，我验证了 const iterator 是否能够返回首尾元素的值。
+这里在内部分别调用了 `const\_iterator begin() const` 和 `const\_iterator end() const`。
+\end{enumerate}
+
+\subsection{测试边界条件 -- testBoundaryConditions}
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testBoundaryConditions() {
+        List<int> list;
+        assert(list.size() == 0);
+        assert(list.empty());
+        list.push_back(1);
+        assert(list.size() == 1);
+        assert(!list.empty());
+        list.push_back(2);
+        list.push_front(0);
+        assert(list.size() == 3);
+        assert(list.front() == 0);
+        assert(list.back() == 2);
+        list.pop_front();
+        list.pop_back();
+        assert(list.size() == 1);
+        assert(list.front() == 1);
+        assert(list.back() == 1);
+    }
+\end{lstlisting}
+
+在这部分测试中，我构造了一个空的链表 list，并进行了一系列的边界条件测试，以确保链表的功能能够正常实现。
+
+首先，我验证了空链表的 size 是否为 0，以及 empty() 函数是否正确返回 true。接着，我向链表中添加了一个元素，
+并检查 size 是否正确更新为 1，empty() 函数是否返回 false。
+然后，我继续向链表中添加更多元素，并使用 push\_front 函数在头部插入元素，
+验证链表的 size 是否正确增加，以及 front() 和 back() 函数是否返回正确的首尾元素值。
+最后，我测试了 pop\_front 和 pop\_back 函数，它们分别删除链表的首尾元素。
+我验证了这些操作后链表的 size 是否正确减少，以及 front() 和 back() 函数是否返回剩余元素的正确值。
+
+
+\section{测试的结果}
+
+测试结果输出如下：
+\begin{lstlisting}[language=c++, breaklines=true, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+
+    1 2 3 4 5 
+    1 2 3 4 5
+    1 2 3 4 5
+    one two three
+    1 2 3 4 5
+    1 2 3 4 5
+    one two three
+    4 5 6 1 2 3
+    6 1 2
+    0 7 6 1 2
+    0 2
+
+    -0.2 -0.1 0.1 0.2 0.3 0.4
+    -0.2 -0.1 0.1 0.2 0.3 0.4 0.5 0.6
+    0.1 0.2 0.3 0.4 0.5 0.6
+    0.1 0.2 0.3 0.4 0.5
+    1 2 3 4 5
+    All tests passed!
+\end{lstlisting}
+
+测试结果一切正常，空行也正确输出。
+
+我用 valgrind 进行测试，发现没有发生内存泄露。
+
+
+\section{（可选）bug报告}
+
+在 list.cpp 中我编写了 2 个函数，分别为 void bug1() 和 void bug2()，来复现错误。
+
+第一个 bug 的触发条件如下：
+
+\begin{enumerate}
+    \item 首先初始化一个列表，不进行任何的赋值
+    \item 然后尝试调用 list.front() 和 list.back() 打印第一个元素和最后一个元素
+    \item 此时发现程序可以编译，但是无法成功运行
+\end{enumerate}
+
+据我分析，它出现的原因是：list.front() 和 list.back() 均没有对空数组进行处理，
+而是直接返回了 *begin() 和 *\-\-end(). 因此我修改了代码，如下所示，这样在运行时如果遇到尝试打印空数组时会抛出错误。
+
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    Object &front()
+    {
+        if(empty())
+            throw std::out_of_range("Attempting to access front of an empty list");
+        return *begin(); 
+    }
+
+    Object &back()
+    {
+        if(empty())
+            throw std::out_of_range("Attempting to access back of an empty list");
+        return *--end();
+    }
+\end{lstlisting}
+
+第二个 bug 的触发条件如下：
+
+\begin{enumerate}
+    \item 首先初始化一个列表
+    \item 然后尝试调用 list.erase() 删除 list.end()，即哨兵节点 tail. 
+    \item 此时发现程序可以编译，但是无法成功运行
+\end{enumerate}
+
+据我分析，它出现的原因是：list.erase() 没有对边界情况 head 和 tail进行处理，
+而是直接删除了该节点. 因此我修改了代码，如下所示，这样就可以避免删除 head 和 tail 的情况，让程序正常运行。
+
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    iterator erase(iterator itr)
+    {
+        if(itr != tail && itr != head)     // 输入的迭代器不能是 head 和 tail
+        {
+            Node *p = itr.current;
+            iterator retVal{ p->next };
+            p->prev->next = p->next;
+            p->next->prev = p->prev;
+            delete p;
+            theSize--;
+            return retVal;
+        } else if (itr == head)
+            return ++itr;
+        else
+            return itr;
+    }
+\end{lstlisting}
+
+由于我在 list.h 中修改相关设计，因此如果执行 void bug1()，会抛出错误；如果执行 void bug2()，不会有任何错误。
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 
