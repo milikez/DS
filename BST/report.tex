@@ -1,0 +1,175 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{geometry, CJKutf8}
+\geometry{margin=1.5cm, vmargin={0pt,1cm}}
+\setlength{\topmargin}{-1cm}
+\setlength{\paperheight}{29.7cm}
+\setlength{\textheight}{25.3cm}
+
+% useful packages.
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings,xcolor}
+\usepackage{float, caption}
+
+\lstset{
+    basicstyle=\ttfamily, basewidth=0.5em
+}
+
+% some common command
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle#1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif#1}{\dif#2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\begin{document}
+
+\pagestyle{fancy}
+\fancyhead{}
+\lhead{周妍祯, 3210103986}
+\chead{数据结构与算法第五次作业}
+\rhead{Oct.31th, 2024}
+
+\section{remove函数的修改}
+原本的 remove 函数在处理删除的节点有 2 个子节点的情况时，先查找右子树中的最小元素赋给当前节点，
+然后再查找一次最小元素进行删除，一共进行了 2 次搜索而且进行了值的复制，而实际上只需要 1 次查找和替换就可以完成。
+
+因此，一种更加高效的实现方法是，在找到右子树最小元素的时候就进行删除，并将该节点的指针直接返回，
+然后对该节点的 left 和 right 指针进行修改即可。
+
+首先，我实现了 BinaryNode *detachMin(BinaryNode *\&t) 函数，
+该函数的作用是查找以 t 为根的子树中的最小节点，返回这个节点，并从原子树中删除这个节点。
+具体函数实现如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    BinaryNode *detachMin(BinaryNode *&t) {
+        if (t == nullptr)
+            return nullptr;
+        if (t->left != nullptr)
+            return detachMin(t->left);
+        else {
+            BinaryNode *minNode = t;
+            t = t->right;
+            return minNode;
+        }
+    }
+\end{lstlisting}
+
+在 detachMin 函数中，如果查找的树是空树则返回 nullptr，如果不是空树，则判断左子节点是否存在，
+若左子节点存在，则递归 detachMin(t->left) 直到找到最小值，通过 t = t->right 实现从树中删除这个节点，
+然后直接返回找到的节点。
+
+在 detachMin 函数的基础上，我对 remove 函数进行了如下修改：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void remove(const Comparable &x, BinaryNode * &t) {
+        if (t == nullptr) {
+            return; 
+        }
+        if (x < t->element) {
+            remove(x, t->left);
+        } else if (x > t->element) {
+            remove(x, t->right);
+        } 
+        else if (t->left != nullptr && t->right != nullptr) { 
+            BinaryNode *oldNode = t;
+            t = detachMin(t->right); 
+            t->left = oldNode->left; 
+            if(oldNode->right == t) 
+                t->right = nullptr; 
+            else
+                t->right = oldNode->right;
+            delete oldNode;
+        } else {
+            BinaryNode *oldNode = t;
+            t = (t->left != nullptr) ? t->left : t->right;
+            delete oldNode;
+        }
+    }
+\end{lstlisting}
+
+主要改动在第 2 个 else if 分支内，因为这里进行的是节点的替换，
+因此在将查找到的节点替换前，要保存当前节点信息，以便后续释放空间，我使用 oldNode 来保存当前节点 t. 
+之后调用 detachMin(t->right) 找到右子树的最小节点，直接替换 t. 
+考虑到替换的节点有可能正好是右子节点，因此需要判断 oldNode->right == t 是否成立，如果成立，则直接将 nullptr 赋给 t->right，
+如果不成立，则将原本节点的右子节点赋给 t->right. 替换的节点不可能是左子节点，因此直接将原本节点的左子节点赋给 t->left 即可。
+最后还需要释放 oldNode. 
+
+
+\section{测试程序的设计思路}
+我修改了老师提供的 testBinarySearchTree 函数来测试 remove 函数的功能，首先初始化一个二叉查找树 bst，然后往里面依次插入
+10, 5, 15, 3, 7, 12, 18. 这个二叉树正好是满的，同时打印二叉树将会得到递增的序列 3, 5, 7, 10, 12, 15, 18. 
+接下来是测试 move 函数，我分成了 3 部分进行测试：
+\begin{enumerate}
+    \item 为了测试叶子节点（即没有 child 的节点）的删除，我调用了 bst.remove(7) 来删除叶子节点 7，删除后节点 5 只有 1 个 child，其值为 3；
+    \item 为了测试只有 1 个 child 的节点的删除，我调用了 bst.remove(5) 来删除节点 5，这时节点 5 被节点 3 替代，且 节点 3 没有 child；
+    \item 为了测试有 2 个 child 的节点的删除，我先插入了 1 和 4，这两个新插入的节点将放置在节点 3 的两侧，作为它的左右子节点，
+然后调用 bst.remove(3) 来删除节点 3，由于此时节点 3 的右子树只有 1 个元素 4，因此将由节点 4 替代节点 3，同时节点 4 不再有右子节点；
+最后我调用 bst.remove(10) 来删除根节点 10，此时右子树的最小元素不再是根节点的右子节点，而是节点 15 的左子节点 12，
+故节点 12 将替代根节点，同时节点 15 仍是根节点的右子节点，但节点 15 的左子节点为空。
+\end{enumerate}
+
+在每次调用 remove 函数后我都将结果打印出来，如果所有结果均是顺序排列的则表示测试通过。
+
+
+\section{测试的结果}
+
+测试结果输出如下：
+\begin{lstlisting}[language=c++, breaklines=true, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+Initial Tree:
+3
+5
+7
+10
+12
+15
+18
+Tree after removing 7:
+3
+5
+10
+12
+15
+18
+Tree after removing 5:
+3
+10
+12
+15
+18
+Tree after removing 3:
+1
+4
+10
+12
+15
+18
+Tree after removing 10:
+1
+4
+12
+15
+18
+\end{lstlisting}
+
+测试结果一切正常。
+
+我用 valgrind 进行测试，发现没有发生内存泄露。
+
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 
