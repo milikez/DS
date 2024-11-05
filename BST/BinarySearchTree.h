@@ -397,8 +397,8 @@ private:
             // 找到替换节点，并将当前节点的信息传递给该节点
             t = detachMin(t->right); 
             t->left = oldNode->left; 
-            if(oldNode->right == t)    // 如果替换的节点正好是右子节点，则右子节点为空
-                t->right = nullptr; 
+            if(oldNode->right == t)    // 如果替换的节点正好是右子节点，则应为右子节点的右子节点(包含了nullptr的情况)
+                t->right = oldNode->right->right; 
             else
                 t->right = oldNode->right;
             delete oldNode;
