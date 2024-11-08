@@ -1,0 +1,94 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{geometry, CJKutf8}
+\geometry{margin=1.5cm, vmargin={0pt,1cm}}
+\setlength{\topmargin}{-1cm}
+\setlength{\paperheight}{29.7cm}
+\setlength{\textheight}{25.3cm}
+
+% useful packages.
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings,xcolor}
+\usepackage{float, caption}
+
+\lstset{
+    basicstyle=\ttfamily, basewidth=0.5em
+}
+
+% some common command
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle#1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif#1}{\dif#2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\begin{document}
+
+\pagestyle{fancy}
+\fancyhead{}
+\lhead{周妍祯, 3210103986}
+\chead{数据结构与算法第六次作业}
+\rhead{Nov.8th, 2024}
+
+\section{remove函数的修改}
+原本的 remove 函数只实现了删除特定元素，并维护 BST 的平衡，但没有实现 AvlTree 的平衡。
+回顾 BST 的 remove 函数实现，如果目标节点有两个 child，实际上删除的并不是目标节点，而是目标节点的右子树中的最小节点。
+删除目标节点的右子树中的最小节点很有可能导致右子树失衡，因此必须在 detachMin 函数中增加 balance 函数，
+在删除最小节点后对每一次递归的父节点进行 balance. 
+
+我修改的 BinaryNode *detachMin(BinaryNode *\&t) 函数如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    BinaryNode *detachMin(BinaryNode *&t) {
+        if (t == nullptr)
+            return nullptr;
+        if (t->left != nullptr)
+            BinaryNode *minNode =  detachMin(t->left);
+            balance(t);     // add balance
+            return minNode;
+        else {
+            BinaryNode *minNode = t;
+            t = t->right;
+            return minNode;
+        }
+    }
+\end{lstlisting}
+
+在修改后的 detachMin 函数中，如果找到最小值，则通过 t = t->right 实现从树中删除这个节点，然后返回找到的节点；
+如果是通过多层递归找到的最小值，则除了最后一层直接返回找到的节点外，每一层都将进行一次 balance 修复删除节点可能带来的不平衡，
+然后再返回找到的节点。
+
+在调用 detachMin 函数找到目标元素的右子树中的最小节点并维护右子树平衡后，还需要考虑失衡是否传递到了目标元素或其上方，
+因此在 move 函数的最后也需要增加 balance 函数。不论是找到目标元素还是多层递归 remove 函数，都需要在函数的末尾进行 balance. 
+
+我修改的 void remove(const Comparable \&x, BinaryNode * \&t) 函数如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void remove(const Comparable &x, BinaryNode * &t) {
+        ···     // the same as before, only add balance below
+        balance(t); 
+    }
+\end{lstlisting}
+
+
+\section{测试的结果}
+
+使用助教提供的 "test.cpp" 文件进行测试，结果一切正常，运行时间在 3s 之内。
+
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 
