@@ -10,6 +10,9 @@
  */
 
 #include <iostream>
+#ifdef _WIN32
+#include <windows.h>    // SetConsoleOutputCP
+#endif
 
 /// 临时性的异常类，用于表示树为空的异常
 class UnderflowException { };
@@ -291,14 +294,53 @@ protected:
      * @param t 当前节点指针
      * @param out 输出流
      */
-    void printTree(BinaryNode *t, std::ostream &out) const {
-        /// 中序遍历
-        if (t != nullptr) {
-            printTree(t->left, out);  // 先打印左子树
-            out << t->element << std::endl;  // 打印当前节点
-            printTree(t->right, out);  // 再打印右子树
+    // void printTree(BinaryNode *t, std::ostream &out) const {
+    //     /// 中序遍历
+    //     if (t != nullptr) {
+    //         printTree(t->left, out);  // 先打印左子树
+    //         out << t->element << std::endl;  // 打印当前节点
+    //         printTree(t->right, out);  // 再打印右子树
+    //     }
+    // }
+
+    //替换printTree函数
+    /**
+    * @brief 递归打印树的结构
+    * 
+    * @param t 当前节点指针
+    * @param out 输出流
+    * @param prePrint 前导输出
+    * @param numofChild 当前输出为父节点的第几个子节点
+    * @param noBrother 是否有兄弟节点
+    */
+    void printTree(BinaryNode *t, std::ostream &out, std::string prePrint = "", int numofChild = 1, bool noBrother = 1) const {
+        #ifdef _WIN32
+        //设置输出流为UTF-8
+        SetConsoleOutputCP(CP_UTF8);
+        #endif
+        //根节点输出“root”
+        if(t == this->root){
+            out << "root" << std::endl;
+        }
+        //当前节点非空则输出数据
+        if(t != nullptr){
+            printTree(t->left, out, prePrint + (numofChild < 1 ? "    " : "│   "), 0, t->right == nullptr);
+            //打印前导输出
+            out << prePrint
+            //判断当前节点是否是最后一个子节点，输出不同的枝杈
+            << (numofChild < 1 ? "┌───" : "└───")
+            << t->element
+            << std::endl;
+            //判断当前节点是否是最后一个子节点，添加不同的前导输出
+            //判断是否有兄弟节点
+            printTree(t->right, out, prePrint + (numofChild < 1 ? "│   " : "    "), 1, t->left == nullptr);
+        }
+        //若当前节点为空但有兄弟节点，输出#
+        else if(!noBrother){
+            out << prePrint << (numofChild < 1 ? "┌───" : "└───") << "#" << std::endl;
         }
     }
+
 
     /**
      * @brief 递归清空树中的所有元素
