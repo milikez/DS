@@ -1,0 +1,257 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{geometry, CJKutf8}
+\geometry{margin=1.5cm, vmargin={0pt,1cm}}
+\setlength{\topmargin}{-1cm}
+\setlength{\paperheight}{29.7cm}
+\setlength{\textheight}{25.3cm}
+
+% useful packages.
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings,xcolor}
+\usepackage{float, caption}
+
+\lstset{
+    basicstyle=\ttfamily, basewidth=0.5em
+}
+
+% some common command
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle#1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif#1}{\dif#2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\begin{document}
+
+\pagestyle{fancy}
+\fancyhead{}
+\lhead{周妍祯, 3210103986}
+\chead{数据结构与算法第七次作业}
+\rhead{Nov.30th, 2024}
+
+\section{HeapSort.h 的实现}
+堆排序的基本策略是：
+\begin{enumerate}[(1)]
+    \item 建立 $N$ 个元素的二叉堆，这将花费 $O(N)$ 时间
+    \item 通过每次将堆中的最后元素与第一个元素交换，执行 $N-1$ 次 deleteMax 操作，这将花费 $O(N\log(N))$ 时间
+\end{enumerate}
+
+其中每次将堆中的最后元素与第一个元素交换的目的是将当前堆中的最大元素放到最后，
+实现排序后呈现递增序列。 deleteMax 操作实际上就是下滤(percolate down)操作，但这里需要注意，
+每次交换元素后要将堆的大小缩减 1 再进行下滤。
+
+同时通过上面的分析，堆排序将花费 $O(N\log(N))$ 的时间代价。
+
+\subsection{percolateDown 函数的实现}
+我实现的 void percolateDown( std::vector<Comparable> \& sequence, int i, int n ) 函数如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void percolateDown( std::vector<Comparable> & sequence, int i, int n )
+    {
+        int child;
+        Comparable tmp = std::move( sequence[i] );
+
+        for( ; (2*i+1) < n; i = child )
+        {
+            child = 2 * i + 1;
+            if( (child != n - 1) && (sequence[child] < sequence[child + 1]))
+                ++child;
+            if( tmp < sequence[child] )
+                sequence[i] = std::move( sequence[child] );
+            else
+                break;
+        }
+        sequence[i] = std::move(tmp);
+    }; 
+\end{lstlisting}
+
+函数传递 3 个参数 \{sequence, i, n\}，分别表示数组引用、执行下滤操作的节点位置、执行范围。
+由于 std::vector 元素由下标 0 开始，因此对于任意位置 i 处的节点，其 2 个 child 的位置分别在
+ 2*i+1 和 2*(i+1) 处。对于下滤操作，需要找到孩子中的较大者，如果该节点的位置比孩子中的较大者小，
+则需要进行元素交换；否则该节点就找到了它的正确位置。
+
+\subsection{heapsort 函数的实现}
+在 percolateDown 的基础上，我实现的 void heapsort( std::vector<Comparable> \& sequence ) 函数如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void heapsort( std::vector<Comparable> & sequence )
+    {
+        int i, j; 
+        // build the heap
+        for( i = sequence.size()/2 - 1; i >= 0; --i ) 
+            percolateDown( sequence, i, sequence.size() );
+        // deleteMax (N-1) times
+        for( j = sequence.size() - 1; j > 0; --j )
+        {
+            std::swap( sequence[0], sequence[j] ); 
+            percolateDown( sequence, 0, j );
+        }
+    }; 
+\end{lstlisting}
+
+heapsort 函数实现的步骤与上述堆排序的策略一致。首先建堆，从倒数第二层的最后一个节点开始到根节点，
+调用 N/2 次 percolateDown 函数；然后将堆中的最后元素与第一个元素交换，执行 percolateDown，一共进行
+ N-1 次，因为最后剩下的 1 个元素无需排序。
+
+\section{测试程序的设计思路}
+\subsection{check 函数的实现}
+首先，我编写了 check 函数来检测每⼀次排序的正确性，其中思路是只要任意一个元素比紧跟其后的元素大，则返回 false. 
+其实现如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    bool check(const std::vector<T>& sequence) {
+        for (size_t i = 0; i < sequence.size() - 1; ++i) {
+            if (sequence[i] > sequence[i + 1]) {
+                return false;
+            }
+        }
+        return true;
+    }
+\end{lstlisting}
+
+\subsection{generateSequence 函数的实现}
+然后我编写了一个用于生成测试序列的函数 std::vector<int> generateSequence(int size, int mode)，其实现如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    std::vector<int> generateSequence(int size, int mode) {
+        std::vector<int> sequence;
+        sequence.reserve(size);
+
+        switch (mode) {
+            case 0: { // random sequence
+                for (int i = 0; i < size; ++i) {
+                    sequence.push_back(std::rand() % size);
+                }
+                break;
+            }
+            case 1: { // ordered sequence
+                for (int i = 0; i < size; ++i) {
+                    sequence.push_back(i);
+                }
+                break;
+            }
+            case 2: { // reverse sequence
+                for (int i = 0; i < size; ++i) {
+                    sequence.push_back(size - i - 1);
+                }
+                break;
+            }
+            case 3: { // partial repetitive sequence
+                for (int i = 0; i < size; ++i) {
+                    sequence.push_back(std::rand() % (size / 10));
+                }
+                break;
+            }
+        }
+        return sequence;
+    }
+\end{lstlisting}
+
+函数传递 2 个参数 \{size, mode\}，分别表示数组的大小和生成数组的种类，其中 mode = 0 
+表示生成 random sequence，1 表示生成 ordered sequence，2 表示生成 reverse sequence，
+3 表示生成 partial repetitive sequence. 
+
+对于 random sequence，直接调用 std::rand() 函数生成；对于 ordered sequence，我直接
+将循环变量 i 传入序列；对于 reverse sequence，我直接将 size-i-1 传入序列；对于 partial repetitive sequence，
+由于整个数组的长度为 size, 因此 std::rand()\%(size/10) 一定会产生部分相同的数。
+
+\subsection{testSequence 函数的实现}
+之后我编写了测试函数 void testSequence(std::vector<T>\& sequence)，其实现如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void testSequence(std::vector<T>& sequence) {
+        // test by my heapsort function
+        std::vector<T> copy = sequence;
+        auto start = std::chrono::high_resolution_clock::now();
+        heapsort(copy);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> duration = end - start;
+        if (check(copy)) {
+            std::cout << "heapsort correct. Time: " << duration.count() << " ms" << std::endl;
+        } else {
+            std::cout << "heapsort incorrect." << std::endl;
+        }
+    
+        // test by std::sort_heap function
+        copy = sequence;
+        start = std::chrono::high_resolution_clock::now();
+        std::make_heap(copy.begin(), copy.end());
+        std::sort_heap(copy.begin(), copy.end());
+        end = std::chrono::high_resolution_clock::now();
+        duration = end - start;
+        if (check(copy)) {
+            std::cout << "std::sort_heap correct. Time: " << duration.count() << " ms" << std::endl;
+        } else {
+            std::cout << "std::sort_heap incorrect." << std::endl;
+        }
+    }
+\end{lstlisting}
+
+函数分别调用了我自己实现的 heapsort 和 std::sort\_heap. 每次调用均记录排序所花费时间，然后先用 check 函数检查
+结果是否正确，如果正确则输出排序所用时间；否则输出排序出错的信息。
+
+\subsection{main 函数的实现}
+在上述函数的基础上，我编写的 mian 函数如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    int main() {
+        const size_t size = 1000000;
+        std::vector<int> randomSeq = generateSequence(size, 0);
+        std::vector<int> orderedSeq = generateSequence(size, 1);
+        std::vector<int> reverseSeq = generateSequence(size, 2);
+        std::vector<int> partialRepeatSeq = generateSequence(size, 3);
+    
+        std::cout << "Testing random sequence..." << std::endl;
+        testSequence(randomSeq);
+        std::cout << std::endl; 
+    
+        std::cout << "Testing ordered sequence..." << std::endl;
+        testSequence(orderedSeq);
+        std::cout << std::endl; 
+    
+        std::cout << "Testing reverse sequence..." << std::endl;
+        testSequence(reverseSeq);
+        std::cout << std::endl; 
+    
+        std::cout << "Testing partial repeat sequence..." << std::endl;
+        testSequence(partialRepeatSeq);
+        std::cout << std::endl; 
+    
+        return 0;
+    }
+\end{lstlisting}
+
+函数中分别生成了 4 种测试序列，然后测试其是否正确并输出运行时间。
+
+\section{测试的结果}
+
+某一次的测试结果如下表所示：
+\begin{table}[h!]
+    \begin{center}
+        \caption{Comparison of heapsort times for different sequences.}
+        \begin{tabular}{l|c|c} 
+            \textbf{ } & \textbf{my heapsort time} & \textbf{std::sort\_heap time}\\
+            \hline
+            random sequence & 322.959 ms & 480.394 ms \\
+            ordered sequence & 211.294 ms & 360.728 ms \\
+            reverse sequence & 217.382 ms & 372.663 ms \\
+            repetitive sequence & 343.925 ms & 528.947 ms \\
+        \end{tabular}
+    \end{center}
+\end{table}
+
+由于我的测试序列是随机产生的，因此可能会导致不同的结果。
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 
