@@ -3,7 +3,17 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>
+#include <random>
 #include "HeapSort.h"
+
+template <typename T>
+void print_sequence(const std::vector<T>& sequence) {
+    for (size_t i = 0; i < sequence.size(); ++i) {
+        std::cout << sequence[i] << " "; 
+    }
+    std::cout << std::endl; 
+}
+
 
 /**
  * @brief check the correctness of the sorting results
@@ -29,14 +39,18 @@ bool check(const std::vector<T>& sequence) {
  *                             2 for reverse sequence, 3 for partial repetitive sequence
  * @return the generated test sequence
  */
-std::vector<int> generateSequence(int size, int mode) {
-    std::vector<int> sequence;
+std::vector<unsigned int> generateSequence(int size, int mode) {
+    std::vector<unsigned int> sequence;
     sequence.reserve(size);
+
+    std::random_device rd; 
+    std::mt19937 gen(rd()); 
+    std::uniform_int_distribution<__int128_t> distrib(0, 4294967295);
 
     switch (mode) {
         case 0: { // random sequence
             for (int i = 0; i < size; ++i) {
-                sequence.push_back(std::rand());
+                sequence.push_back(distrib(gen));
             }
             break;
         }
@@ -54,7 +68,7 @@ std::vector<int> generateSequence(int size, int mode) {
         }
         case 3: { // partial repetitive sequence
             for (int i = 0; i < size; ++i) {
-                sequence.push_back(std::rand() % (size / 10));
+                sequence.push_back(distrib(gen) % (size / 10));
             }
             break;
         }
@@ -76,6 +90,7 @@ void testSequence(std::vector<T>& sequence) {
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     if (check(copy)) {
+        // print_sequence(copy);
         std::cout << "heapsort correct. Time: " << duration.count() << " ms" << std::endl;
     } else {
         std::cout << "heapsort incorrect." << std::endl;
@@ -98,10 +113,14 @@ void testSequence(std::vector<T>& sequence) {
 
 int main() {
     const size_t size = 1000000;
-    std::vector<int> randomSeq = generateSequence(size, 0);
-    std::vector<int> orderedSeq = generateSequence(size, 1);
-    std::vector<int> reverseSeq = generateSequence(size, 2);
-    std::vector<int> partialRepeatSeq = generateSequence(size, 3);
+    std::vector<unsigned int> randomSeq = generateSequence(size, 0);
+    // print_sequence(randomSeq);
+    std::vector<unsigned int> orderedSeq = generateSequence(size, 1);
+    // print_sequence(orderedSeq);
+    std::vector<unsigned int> reverseSeq = generateSequence(size, 2);
+    // print_sequence(reverseSeq);
+    std::vector<unsigned int> partialRepeatSeq = generateSequence(size, 3);
+    // print_sequence(partialRepeatSeq);
 
     std::cout << "Testing random sequence..." << std::endl;
     testSequence(randomSeq);

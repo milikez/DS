@@ -120,16 +120,20 @@ heapsort 函数实现的步骤与上述堆排序的策略一致。首先建堆�
 \end{lstlisting}
 
 \subsection{generateSequence 函数的实现}
-然后我编写了一个用于生成测试序列的函数 std::vector<int> generateSequence(int size, int mode)，其实现如下：
+然后我编写了一个用于生成测试序列的函数 std::vector<unsigned int> generateSequence(int size, int mode)，其实现如下：
 \begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
-    std::vector<int> generateSequence(int size, int mode) {
-        std::vector<int> sequence;
+    std::vector<unsigned int> generateSequence(int size, int mode) {
+        std::vector<unsigned int> sequence;
         sequence.reserve(size);
-
+    
+        std::random_device rd; 
+        std::mt19937 gen(rd()); 
+        std::uniform_int_distribution<__int128_t> distrib(0, 4294967295);
+    
         switch (mode) {
             case 0: { // random sequence
                 for (int i = 0; i < size; ++i) {
-                    sequence.push_back(std::rand() % size);
+                    sequence.push_back(distrib(gen));
                 }
                 break;
             }
@@ -147,7 +151,7 @@ heapsort 函数实现的步骤与上述堆排序的策略一致。首先建堆�
             }
             case 3: { // partial repetitive sequence
                 for (int i = 0; i < size; ++i) {
-                    sequence.push_back(std::rand() % (size / 10));
+                    sequence.push_back(distrib(gen) % (size / 10));
                 }
                 break;
             }
@@ -160,9 +164,9 @@ heapsort 函数实现的步骤与上述堆排序的策略一致。首先建堆�
 表示生成 random sequence，1 表示生成 ordered sequence，2 表示生成 reverse sequence，
 3 表示生成 partial repetitive sequence. 
 
-对于 random sequence，直接调用 std::rand() 函数生成；对于 ordered sequence，我直接
-将循环变量 i 传入序列；对于 reverse sequence，我直接将 size-i-1 传入序列；对于 partial repetitive sequence，
-由于整个数组的长度为 size, 因此 std::rand()\%(size/10) 一定会产生部分相同的数。
+对于 random sequence，使用 random 库中基于梅森旋转算法的伪随机数生成器函数生成，其中 distrib(0, 4294967295) 表示将随机数的范围限制在无符号整数内；
+对于 ordered sequence，我直接将循环变量 i 传入序列；对于 reverse sequence，我直接将 size-i-1 传入序列；对于 partial repetitive sequence，
+由于整个数组的长度为 size, 因此 distrib(gen)\%(size/10) 一定会产生部分相同的数。
 
 \subsection{testSequence 函数的实现}
 之后我编写了测试函数 void testSequence(std::vector<T>\& sequence)，其实现如下：
@@ -203,10 +207,10 @@ heapsort 函数实现的步骤与上述堆排序的策略一致。首先建堆�
 \begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
     int main() {
         const size_t size = 1000000;
-        std::vector<int> randomSeq = generateSequence(size, 0);
-        std::vector<int> orderedSeq = generateSequence(size, 1);
-        std::vector<int> reverseSeq = generateSequence(size, 2);
-        std::vector<int> partialRepeatSeq = generateSequence(size, 3);
+        std::vector<unsigned int> randomSeq = generateSequence(size, 0);
+        std::vector<unsigned int> orderedSeq = generateSequence(size, 1);
+        std::vector<unsigned int> reverseSeq = generateSequence(size, 2);
+        std::vector<unsigned int> partialRepeatSeq = generateSequence(size, 3);
     
         std::cout << "Testing random sequence..." << std::endl;
         testSequence(randomSeq);
@@ -239,15 +243,18 @@ heapsort 函数实现的步骤与上述堆排序的策略一致。首先建堆�
         \begin{tabular}{l|c|c} 
             \textbf{ } & \textbf{my heapsort time} & \textbf{std::sort\_heap time}\\
             \hline
-            random sequence & 322.959 ms & 480.394 ms \\
-            ordered sequence & 211.294 ms & 360.728 ms \\
-            reverse sequence & 217.382 ms & 372.663 ms \\
-            repetitive sequence & 343.925 ms & 528.947 ms \\
+            random sequence & 110.075 ms & 106.002 ms \\
+            ordered sequence & 60.9988 ms & 57.0015 ms \\
+            reverse sequence & 65.0026 ms & 63.9533 ms \\
+            repetitive sequence & 110.073 ms & 103.99 ms \\
         \end{tabular}
     \end{center}
 \end{table}
 
 由于我的测试序列是随机产生的，因此可能会导致不同的结果。
+可以看到表中我编写 heapsort 函数和 std::sort\_heap 的运行时间没有相差很多，稍微慢了一点。
+
+程序运行时间在 3s 之内。
 
 \end{document}
 
