@@ -245,7 +245,7 @@ double cal_post(const std::string &str){
                 case '*': num_stack.push(a * b); break;
                 case '/': 
                     if (a == 0)
-                        std::cout << "divisor = 0, Invalid. "; 
+                        std::cout << "divisor = 0, ILLEGAL. "; 
                     num_stack.push(b / a); 
                     break;
                 default: break;

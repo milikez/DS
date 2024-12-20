@@ -37,7 +37,7 @@ void test_expression(const std::string &expr) {
     std::cout << "Testing expression: " << expr << std::endl;
 
     if (!infix_check(expr)) {
-        std::cout << "Invalid" << std::endl;
+        std::cout << "ILLEGAL" << std::endl;
         return;
     }
 
