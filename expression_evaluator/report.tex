@@ -1,0 +1,644 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{geometry, CJKutf8}
+\geometry{margin=1.5cm, vmargin={0pt,1cm}}
+\setlength{\topmargin}{-1cm}
+\setlength{\paperheight}{29.7cm}
+\setlength{\textheight}{25.3cm}
+
+% useful packages.
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings,xcolor}
+\usepackage{float, caption}
+
+\lstset{
+    basicstyle=\ttfamily, basewidth=0.5em
+}
+
+% some common command
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle#1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif#1}{\dif#2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\begin{document}
+
+\pagestyle{fancy}
+\fancyhead{}
+\lhead{周妍祯, 3210103986}
+\chead{数据结构与算法项目作业：四则混合运算器}
+\rhead{Dec.20th, 2024}
+
+\section{expression\_evaluator.h 的设计思路}
+四则混合运算器的设计可以分成 3 部分：
+\begin{enumerate}[(1)]
+    \item 判断表达式是否合法，若合法则进行下一步，否则直接结束运算并输出 “invalid” 以及非法的原因
+    \item 中缀表达式到后缀表达式的转换
+    \item 根据后缀表达式进行四则运算
+\end{enumerate}
+
+这 3 部分的设计我分别用 infix\_check, infix2postfix, cal\_post 函数实现，下面将详细介绍这 3 个函数的实现。
+
+\subsection{一些通用函数的实现}
+在介绍 3 个主要函数之前，我将介绍常用的函数，这些函数在 3 个函数中经常会使用到，因此我将其封装起来。
+这些函数分别是 is\_operator, is\_num, is\_bracket. 
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    bool is_operator(const char & c){
+        switch (c) {
+            case '+':
+            case '-':
+            case '*':
+            case '/':   return true; 
+            default:    return false; 
+        }
+    }
+    
+    bool is_num(const char & c){
+        if (((c >= '0') && (c <= '9')) || (c == '.') || (c == 'E') || (c == 'e'))
+            return true; 
+        return false; 
+    }
+    
+    bool is_bracket(const char & c){
+        if ((c == '(') || (c == ')'))
+            return true; 
+        return false;
+    }
+\end{lstlisting}
+
+这些函数的实现都很简单，因此我简要概括一下它们的功能。
+is\_operator 函数用于判断当前字符是否为操作符(+, -, *, /)，如果是则返回 true，否则返回 false；
+is\_num 函数用于判断当前字符是否为数字，考虑到小数和科学计数法，所以包含 \{0$\sim$9, ., E/e\} 的均视为数字，如果是则返回 true，否则返回 false；
+is\_bracket 函数由于判断当前字符是否为括号，包括左括号和右括号，如果是则返回 true，否则返回 false. 
+
+\subsection{infix\_check 函数的实现}
+函数接口为 bool infix\_check(const std::string \&str)，输入参数为一个 std::string 的常量引用，因为我们不想改变这个字符串，
+输出为一个 bool 类型的值，若中缀表达式合法则输出 true，否则输出 false. 
+
+中缀表达式的错误主要分为几类：表达式以运算符开头或结尾、存在非法字符、数字不合法（如 .10, 0.43.5, 1.23e1.23 等）、括号不匹配
+、运算符连续使用、左括号后和右括号前不能是运算符、除数是 0. 我在函数中分别进行检测。
+
+检测表达式以运算符开头或结尾的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    if (is_operator(str[0]) || is_operator(str[str.size()-1])){
+        if (str[0] == '-') {
+            if (!is_num(str[1])){    // 不是负数
+                std::cout << "Expressions begin or end with an operator. "; 
+                return false; 
+            }
+        } else {
+            std::cout << "Expressions begin or end with an operator. "; 
+            return false; 
+        }
+    }
+\end{lstlisting}
+直接判断表达式开头和结尾的字符即可。但这里有一种特殊情况，即以负数开头的情况，所以在代码中特别对 str[0] == '-' 的情况进行处理，
+如果紧随其后的第一个字符不是数字，那么表达式是非法的。
+
+检测存在非法字符的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    for(std::string::size_type i = 0; i < str.size(); ++i){
+        if ((!is_operator(str[i])) && (!is_num(str[i])) && (!is_bracket(str[i]))){
+            std::cout << "Illegal characters are present. "; 
+            return false; 
+        }
+    }
+\end{lstlisting}
+通过 for 循环遍历字符串中的每一个字符，然后判断其是否是操作符或数字或括号，如果均不是则表达式非法。
+
+检测数字不合法的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    for(std::string::size_type i = 0; i < (str.size()-1); ++i){
+        if (is_num(str[i])) {
+            if ((str[i] == '.') || (str[i] == 'e') || (str[i] == 'E')) {
+                std::cout << "Numbers are not legitimate. "; 
+                return false; 
+            }
+            
+            std::string::size_type j = i+1; 
+            int dot_num = 0, e_num = 0; 
+            while (is_num(str[j])){
+                if (str[j] == '.')
+                    ++dot_num;
+                if ((str[j] == 'e') || (str[j] == 'E')){
+                    ++e_num;
+                    if ((str[j+1] == '-') && (!is_num(str[j+2]))) {
+                        std::cout << "Numbers are not legitimate. "; 
+                        return false; 
+                    } else if (!is_num(str[j+1]) && (str[j+1] != '-')){
+                        std::cout << "Numbers are not legitimate. "; 
+                        return false; 
+                    } 
+                }
+                if ((dot_num > 1) || (e_num > 1)) {
+                    std::cout << "Numbers are not legitimate. "; 
+                    return false; 
+                }
+                ++j;
+            }
+            i = j-1; 
+        }
+    }
+\end{lstlisting}
+这里的数字不合法有很多种情况，包括以小数点或 e/E 开头(.19, e19)、存在 2 个小数点或 e/E (1.45.34, 1e10e23)、科学计数法的指数为小数(1.23e1.55)等。
+通过 for 循环遍历字符串中的每一个字符，如果当前字符是一个数字，则进入 if 函数内部进一步检查。如果当前字符为 \{., e, E\} 中的任意一个，
+表示该数字以小数点或 e/E 开头，返回 false. 由于数字往往不是以单个字符存在的，因此继续检查该字符后的字符是否为数字。在 while (is\_num(str[j])) 中，
+用 dot\_num 和 e\_num 分别记录出现小数点和 e/E 的次数，如果 dot\_num 或 e\_num 大于 1，则返回 false；
+同时如果 e/E 后出现负号但非负数或者出现其他运算符，均为非法，返回 false. 
+当该数字检测完毕后，需要调整 i 到该数字的最后 1 位，因为每次 for 循环结束均会执行 ++i. 
+
+检测括号不匹配的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    std::stack<char> bracket_stack;
+    for(std::string::size_type i = 0; i < str.size(); ++i){
+        if (str[i] == '('){ 
+            bracket_stack.push(str[i]);
+        } else if (str[i] == ')'){ 
+            if(!bracket_stack.empty())
+                bracket_stack.pop(); 
+            else {
+                std::cout << "The parentheses do not match. "; 
+                return false; 
+            }
+        }
+    }
+    if (!bracket_stack.empty()){
+        std::cout << "The parentheses do not match. "; 
+        return false; 
+    }
+\end{lstlisting}
+该检测基于栈实现。首先声明一个空栈 bracket\_stack. 通过 for 循环遍历字符串中的每一个字符，如果该字符为左括号，则将其推入栈中；
+如果该字符为右括号，则当栈空时返回 false，否则将栈元素弹出。在遍历完后，如果栈非空则返回 false. 
+
+检测运算符连续使用的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    for(std::string::size_type i = 0; i < (str.size()-1); ++i){
+        if ((is_operator(str[i])) && (is_operator(str[i+1]))) {
+            if (str[i+1] == '-') { 
+                if (!is_num(str[i+2])){    // 不是负数
+                    std::cout << "The operator is used continuously. "; 
+                    return false; 
+                }
+            } else {
+                std::cout << "The operator is used continuously. "; 
+                return false; 
+            }
+        } 
+    }
+\end{lstlisting}
+直接检测相连的 2 个字符是否均为操作符即可。但存在一种特殊情况，即操作符后为一个负数，代码中用 (str[i+1] == '-') 对这种情况做了特别的判断，
+如果不是负数，则返回 false. 
+
+检测左括号后和右括号前不能是运算符的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    for(std::string::size_type i = 0; i < (str.size()-1); ++i){
+        if ((str[i] == '(') && (is_operator(str[i+1]))) {
+            if (str[i+1] != '-') {
+                std::cout << "After the opening parenthesis cannot be operators. "; 
+                return false; 
+            } else if (!is_num(str[i+2])) {    // 不是负数
+                std::cout << "After the opening parenthesis cannot be operators. "; 
+                return false; 
+            }
+        } else if (is_operator(str[i]) && (str[i+1] == ')')) {
+            std::cout << "Before the closing parenthesis cannot be operators. "; 
+            return false; 
+        }
+    }
+\end{lstlisting}
+直接检测左括号后和右括号前的字符即可。但存在一种特殊情况，即左括号后紧跟一个负数，代码中用 else if (!is\_num(str[i+2])) 对这种情况做了特别的判断，
+如果不是负数，则返回 false. 
+
+检测除数是 0 的相关代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    for(std::string::size_type i = 0; i < (str.size()-1); ++i){
+        if (str[i] == '/') {
+            if (str[i+1] != '(') {
+                std::string::size_type j = i+1;
+                while ((str[j] != '\0') && (!is_operator(str[j]))){
+                    ++j;  
+                }
+                std::string divisor(str, i+1, j-1);
+                double num = std::stod(divisor);
+                if (num == 0.0){
+                    std::cout << "divisor = " << num << ". ";
+                    return false;
+                }
+                i = j-1; 
+            }
+        }
+    }
+\end{lstlisting}
+通过 for 循环遍历字符串中的每一个字符，如果当前字符为除号 /，则需要判断其后的除数是否为 0. 这里需要考虑 0.000 的情况，
+因此我用 while ((str[j] != '\textbackslash0') \&\& (!is\_operator(str[j]))) 循环先把表示整个数字的字符串范围(i+1, j-1)找到，然后用 std::stod 函数
+将范围内的字符串转换为数字，判断该数字是否为 0，如是则返回 false. 
+
+在函数的最后是 reutrn true，表示输入的中缀表达式通过上述的检测，是合法的。
+
+\subsection{infix2postfix 函数的实现}
+中缀表达式到后缀表达式的转换是基于栈实现的。这个算法的思路是：当看到一个运算符的时候，先把它放到栈中，栈表示挂起的运算符；
+如果栈中有些具有高优先级的运算符需要完成其使用，则应该被弹出。换句话来说，在把当前运算符放入栈中之前，那些在栈中并且在当前运算符之前
+要完成使用的运算符要被弹出。
+
+具体代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void infix2postfix(const std::string &str, std::string &post){
+        std::stack<char> infix_stack;
+        std::string::size_type i = 0; 
+    
+        if (str[0] == '-'){
+            post.push_back(str[0]);
+            i = 1; 
+        }
+    
+        for( ; i < str.size(); ++i){
+            if (str[i] == '('){ 
+                // 遇到左括号就放入 stack 中
+                infix_stack.push(str[i]);
+            } else if (str[i] == ')'){    
+                // 遇到右括号则将左括号之前的都弹出
+                while(infix_stack.top() != '('){
+                    post.push_back(infix_stack.top()); 
+                    infix_stack.pop();
+                }
+                infix_stack.pop();      // 不要忘记把'(' pop 出去
+                post.push_back(' ');
+            } else if ((str[i] == '*') || (str[i] == '/')){
+                // 遇到乘除则将栈中的(*, /)全部弹出
+                while ((!infix_stack.empty()) && ((infix_stack.top() == '*') || (infix_stack.top() == '/'))){
+                    post.push_back(infix_stack.top());
+                    infix_stack.pop();
+                }
+                infix_stack.push(str[i]);
+                post.push_back(' ');
+            } else if ((str[i] == '+') || (str[i] == '-')){
+                if ((str[i] == '-') && (is_operator(str[i-1]) || (str[i-1] == '(') || (str[i-1] == 'e') || (str[i-1] == 'E'))){
+                    post.push_back(str[i]);
+                } else {
+                    // 遇到加减则将栈中的(+, -, *, /)全部弹出
+                    while ((!infix_stack.empty()) && (is_operator(infix_stack.top()))){
+                        post.push_back(infix_stack.top());
+                        infix_stack.pop();
+                    }
+                    infix_stack.push(str[i]);
+                    post.push_back(' ');
+                }
+            } else {
+                post.push_back(str[i]);
+            }
+        }
+        // 式子结束则将 stack 中的内容全部弹出
+        while (!infix_stack.empty()) {
+            post.push_back(infix_stack.top()); 
+            infix_stack.pop();
+        }
+        
+        std::cout << "postfix: " << post << std::endl;
+    }    
+\end{lstlisting}
+
+函数的输入参数为需要转换的中缀表达式的常量引用和存储后缀表达式的字符串引用，该函数没有输出，因为转换后的后缀表达式直接放在 
+post 中。
+
+首先声明一个空栈 infix\_stack 用于存放挂起的操作符。由于进行转换的中缀表达式均是已经经过 infix\_check 函数检测的，因此都是合法的，
+但首字符有可能为负号(-)以表示负数，对于这种情况，这个指示负数的负号不应被放入 infix\_stack，所以直接将其推入 post 中，并将 i 赋为 1 
+表示循环从字符串的第 1 个位置开始(原本首字符的位置为 0)。
+
+在 for 循环中遍历字符串中的每一个字符：如果当前符号为左括号，则将其推入栈中；如果当前符号为右括号，则将左括号之前的都弹出，推入 post 中，包括左括号；
+如果当前符号为乘号或除号，则将栈中的乘号和除号全部弹出，推入 post 中；如果当前符号为加号或减号，则将栈中的加减乘除号全部弹出，推入 post 中；
+其余情况均直接将该字符推入 post 中。如果在 for 循环结束后 infix\_stack 不为空，则将剩下的元素全部弹出，推入 post 中。
+
+\subsection{cal\_post 函数的实现}
+计算后缀表达式也是基于栈实现的。这个算法的思路是：当见到一个数时就把它推入栈中；在遇到一个运算符时该运算符就作用于从该栈弹出的
+两个数上，再将所得结果推入栈中。这里有一个需要解决的事情是将所有表达操作数的字符串转换为数字(double 类型)后，再将其存入栈中。
+
+具体代码如下：
+\begin{lstlisting}[language=c++, breaklines=true, keywordstyle=\color{blue!70}, commentstyle=\color{red!50!green!50!blue!50}, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    double cal_post(std::string &str){
+        std::stack<double> num_stack;
+    
+        for(std::string::size_type i = 0; i < str.size(); ++i){ 
+            if ((is_num(str[i])) || ((str[i] == '-') && is_num(str[i+1]))) {
+                std::string::size_type j = i+1;
+                while (is_num(str[j])){
+                    if ((str[j] == 'e') || (str[j] == 'E')) {
+                        if (str[j+1] == '-')
+                            j = j+2; 
+                    } else {
+                        ++j;
+                    }
+                }
+                std::string num = str.substr(i, j-i);
+                double number = std::stod(num);
+                num_stack.push(number);
+                // std::cout << "num = " << num << ", ";
+                i = j-1; 
+            } else if (is_operator(str[i])) {
+                double a = num_stack.top();     // get the first operator
+                num_stack.pop();
+                double b = num_stack.top();     // get the second operator
+                num_stack.pop();
+    
+                switch (str[i]) {
+                    case '+': num_stack.push(a + b); break; 
+                    case '-': num_stack.push(b - a); break; 
+                    case '*': num_stack.push(a * b); break;
+                    case '/': 
+                        if (a == 0)
+                            std::cout << "divisor = 0, "; 
+                        num_stack.push(b / a); 
+                        break;
+                    default: break;
+                }
+            }
+        } 
+    
+        return num_stack.top();
+    }
+\end{lstlisting}
+
+函数的输入参数为后缀表达式的常量引用，输出为该后缀表达式计算的结果，以double的形式返回。
+
+首先声明一个空栈，用于存放转换成double类型后的操作数。在 for 循环中遍历字符串中的每一个字符：如果当前字符是一个数字或者当前字符是负号且下一个字符是数字，
+则通过 while 循环找到操作数的结束位置，通过 std::stod 函数将其转换为 double 类型，然后推入栈中；如果当前字符是操作符，则连续弹出栈顶的 2 个元素，
+根据操作符执行特定的计算，并将计算结果推入栈中。当 for 循环结束后，弹出的栈顶元素即为运算结果。
+
+\section{测试程序的设计思路}
+
+我的测试程序可以分为 2 部分：一部分是我自己设置的一些测试样例，用于检测一些极端情况；另一部分是随机生成的表达式，用于检测普遍的情况。
+接下来我将详细介绍我的测试程序是如何实现的。
+
+\subsection{随机表达式的生成}
+
+为了实现生成随机正确的表达式，我编写的一些函数如下：
+
+\begin{lstlisting}[language=c++, breaklines=true, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    // 生成随机数
+    double random_double() {
+        return static_cast<double>(rand()) / RAND_MAX * 100; 
+    }
+    
+    // 生成随机操作符
+    char random_operator() {
+        int op = rand() % 4;
+        switch (op) {
+            case 0: return '+';
+            case 1: return '-';
+            case 2: return '*';
+            case 3: return '/';
+            default: return '+';
+        }
+    }
+    
+    // 生成随机表达式
+    std::string generate_random_expression(int depth) {
+        if (depth == 0) {
+            return std::to_string(random_double());
+        } else {
+            std::string expr = "(" + generate_random_expression(depth - 1) + random_operator() + generate_random_expression(depth - 1) + ")";
+            return expr;
+        }
+    }    
+\end{lstlisting}
+
+random\_double 函数调用 rand 函数生成 0 到 100 之间的随机浮点数作为操作数；random\_operator 函数使用取余生成随机操作符；
+generate\_random\_expression 函数接受 depth 参数，表示生成表达式的深度，然后递归调用 depth 次本身来生成一个随机表达式。
+
+\subsection{测试函数的编写}
+
+我编写的测试函数如下：
+
+\begin{lstlisting}[language=c++, breaklines=true, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    void test_expression(const std::string &expr) {
+        std::string postfix;
+        std::cout << "Testing expression: " << expr << std::endl;
+    
+        if (!infix_check(expr)) {
+            std::cout << "Invalid" << std::endl;
+            return;
+        }
+    
+        infix2postfix(expr, postfix);
+        double result = cal_post(postfix);
+        std::cout << "Calculated result: " << result << std::endl;
+    }
+    
+    void test_with_random_expression() {
+        srand(time(0)); // 初始化随机数种子
+        int num_tests = 10; // 测试次数
+    
+        for (int i = 0; i < num_tests; ++i) {
+            int depth = rand() % 5 + 1; // 随机深度，1到10
+            std::string expr = generate_random_expression(depth);
+    
+            test_expression(expr);
+            std::cout << std::endl;
+        }
+    }
+    
+    void test_with_fix_expression() {
+        std::vector<std::string> expressions = {
+            ".1+1", "0.99+.88", "e12", "3+1.02e1.9", "22e2e4*8", 
+            "(10+5", "10+5)", "(*3.003)", "(1.9+)", 
+            "+10-5", "*7+8", "--7+8", "1++2.1"
+            "0.0/0.00", "(5+3)/0", 
+            "ten+five", "3.14.5.2", "(10a+5)", 
+            "-7+8", "5+-7", "7*-7", 
+            "(-7)*8+9", "(-5.5+9)*7-1", "-6.3+(-7*9)+-1.8", 
+            "1.2e-10+11", "22.34e-1*10", 
+            "1+1/(1-1)", 
+            "(10+(5*2))-3", "((10.9+3.0)*9.6/8.1)", "10+(5-3)/2"
+        };
+    
+        for (const std::string& exp : expressions) {
+            test_expression(exp);
+            std::cout << std::endl;
+        }
+    }
+\end{lstlisting}
+
+test\_expression 函数接收一个中缀表达式的常量引用。首先调用 infix\_check 函数判断其是否合法，如果不合法则打印 “Invalid”；
+如果合法则调用 infix2postfix 和 cal\_post 函数将其转换成后缀表达式然后进行计算，最后将计算结果打印出来。
+
+test\_with\_random\_expression 和 test\_with\_fix\_expression 函数分别测试随机生成的表达式和我自己设置的一些测试样例。
+前者先调用 generate\_random\_expression 函数生成随机表达式，然后调用 test\_expression 函数进行测试；
+后者遍历我设置的表达式数组 expressions，每次调用 test\_expression 函数进行测试。
+
+在我自己设置的测试样例里，第一排是对非法数字进行的测试，第二排是对括号不匹配进行的测试，第三排是对表达式以符号开头或结尾和
+表达式内出现连续多个符号进行的测试；第四排是对除零进行的测试；第五排是对非法字符进行的测试；第六排是对带负数的表达式进行的测试；
+第七排是对科学计数法表达式进行的测试；第八排是对分母括号内数值为零的测试，这个除零无法在 infix\_check 函数中被检测到，
+因此我在 cal\_post 函数中增加了这种情况的检测；第九排是一些合法表达式的检测。
+
+最后在 main 函数中我调用了 test\_with\_random\_expression 和 test\_with\_fix\_expression 函数。
+
+\section{测试的结果}
+
+测试结果输出如下：
+\begin{lstlisting}[language=c++, breaklines=true, frame=shadowbox, rulesepcolor=\color{red!20!green!20!blue!20}]
+    Testing expression: .1+1
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: 0.99+.88
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: e12
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: 3+1.02e1.9
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: 22e2e4*8
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: (10+5
+    The parentheses do not match. Invalid
+    
+    Testing expression: 10+5)
+    The parentheses do not match. Invalid
+    
+    Testing expression: (*3.003)
+    After the opening parenthesis cannot be operators. Invalid
+    
+    Testing expression: (1.9+)
+    Before the closing parenthesis cannot be operators. Invalid
+    
+    Testing expression: +10-5
+    Expressions begin or end with an operator. Invalid
+    
+    Testing expression: *7+8
+    Expressions begin or end with an operator. Invalid
+    
+    Testing expression: --7+8
+    Expressions begin or end with an operator. Invalid
+    
+    Testing expression: 1++2.10.0/0.00
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: (5+3)/0
+    divisor = 0. Invalid
+    
+    Testing expression: ten+five
+    Illegal characters are present. Invalid
+    
+    Testing expression: 3.14.5.2
+    Numbers are not legitimate. Invalid
+    
+    Testing expression: (10a+5)
+    Illegal characters are present. Invalid
+    
+    Testing expression: -7+8
+    postfix: -7 8+
+    Calculated result: 1
+    
+    Testing expression: 5+-7
+    postfix: 5 -7+
+    Calculated result: -2
+    
+    Testing expression: 7*-7
+    postfix: 7 -7*
+    Calculated result: -49
+    
+    Testing expression: (-7)*8+9
+    postfix: -7  8* 9+
+    Calculated result: -47
+    
+    Testing expression: (-5.5+9)*7-1
+    postfix: -5.5 9+  7* 1-
+    Calculated result: 23.5
+    
+    Testing expression: -6.3+(-7*9)+-1.8
+    postfix: -6.3 -7 9* + -1.8+
+    Calculated result: -71.1
+    
+    Testing expression: 1.2e-10+11
+    postfix: 1.2e-10 11+
+    Calculated result: 11
+    
+    Testing expression: 22.34e-1*10
+    postfix: 22.34e-1 10*
+    Calculated result: 22.34
+    
+    Testing expression: 1+1/(1-1)
+    postfix: 1 1 1 1- /+
+    divisor = 0, Invalid. Calculated result: inf
+    
+    Testing expression: (10+(5*2))-3
+    postfix: 10 5 2* +  3-
+    Calculated result: 17
+    
+    Testing expression: ((10.9+3.0)*9.6/8.1)
+    postfix: 10.9 3.0+  9.6* 8.1/
+    Calculated result: 16.4741
+    
+    Testing expression: 10+(5-3)/2
+    postfix: 10 5 3-  2/+
+    Calculated result: 11
+    
+    Testing expression: ((((94.433424-55.885495)/(29.850154-23.975341))/((80.956450+37.028108)/(99.420148/75.145726)))-(((15.982543*81.200598)*(23.752556-39.555040))+((45.255898/30.716880)/(30.207221/33.878597))))
+    postfix: 94.433424 55.885495-  29.850154 23.975341- /  80.956450 37.028108+  99.420148 75.145726/ / /  15.982543 81.200598*  23.752556 
+    39.555040- *  45.255898 30.716880/  30.207221 33.878597/ / + -
+    Calculated result: 20506.8
+    
+    Testing expression: (((42.661824-28.241829)*(11.114841/99.206519))+((21.091342*82.714316)*(5.719169*90.835292)))
+    postfix: 42.661824 28.241829-  11.114841 99.206519/ *  21.091342 82.714316*  5.719169 90.835292* * +
+    Calculated result: 906303
+    
+    Testing expression: (61.439863-51.066622)
+    postfix: 61.439863 51.066622-
+    Calculated result: 10.3732
+    
+    Testing expression: (27.066866-10.003967)
+    postfix: 27.066866 10.003967-
+    Calculated result: 17.0629
+    
+    Testing expression: ((60.066530+55.845820)+(3.799554/49.128697))
+    postfix: 60.066530 55.845820+  3.799554 49.128697/ +
+    Calculated result: 115.99
+    
+    Testing expression: ((((39.228492+44.767602)*(17.105625*80.697043))+((90.169988*34.827723)/(87.859737*76.461074)))/(((31.388287-61.305582)*(51.393170+69.554735))+((39.390240+69.939268)/(79.894406*81.627857))))
+    postfix: 39.228492 44.767602+  17.105625 80.697043* *  90.169988 34.827723*  87.859737 76.461074* / +  31.388287 61.305582-  51.393170 
+    69.554735+ *  39.390240 69.939268+  79.894406 81.627857* / + /
+    Calculated result: -32.0434
+    
+    Testing expression: (((((12.448500*75.524155)*(15.781121*91.290017))/((26.023133+35.410627)/(22.269356-63.267922)))/(((38.062685+90.267647)-(13.455611/89.315470))*((30.823695-64.241462)*(81.356243-71.065401))))-((((59.089938+8.999908)+(29.358806+53.074740))*((68.523209*50.187689)+(21.863460+50.572222)))*(((76.528214*96.426283)/(96.374401-39.686270))/((15.607166-10.779138)/(38.102359-10.184027)))))     
+    postfix: 12.448500 75.524155*  15.781121 91.290017* *  26.023133 35.410627+  22.269356 63.267922- / /  38.062685 90.267647+  13.455611 
+    89.315470/ -  30.823695 64.241462-  81.356243 71.065401- * * /  59.089938 8.999908+  29.358806 53.074740+ +  68.523209 50.187689*  21.863460 50.572222+ + *  76.528214 96.426283*  96.374401 39.686270- /  15.607166 10.779138-  38.102359 10.184027- / / * -
+    Calculated result: -3.97865e+08
+    
+    Testing expression: (26.270333+49.446089)
+    postfix: 26.270333 49.446089+
+    Calculated result: 75.7164
+    
+    Testing expression: (31.742302+29.960021)
+    postfix: 31.742302 29.960021+
+    Calculated result: 61.7023
+    
+    Testing expression: (((((5.624561+99.832148)-(65.733818+52.571184))+((18.982513-26.474807)*(90.142521/18.448439)))-(((62.163152/35.853145)+(35.654775-17.007965))*((78.389843+83.904538)-(11.697745*99.035615))))*((((30.689413/48.197882)/(5.105747-21.137120))+((57.731864-11.938841)*(67.220069-10.986663)))+(((92.193365*10.443434)+(63.512070+95.040742))*((41.605884/40.119633)/(85.680715+88.778344)))))      
+    postfix: 5.624561 99.832148+  65.733818 52.571184+ -  18.982513 26.474807-  90.142521 18.448439/ * +  62.163152 35.853145/  35.654775 17.007965- +  78.389843 83.904538+  11.697745 99.035615* - * -  30.689413 48.197882/  5.105747 21.137120- /  57.731864 11.938841-  67.220069 10.986663- * +  92.193365 10.443434*  63.512070 95.040742+ +  41.605884 40.119633/  85.680715 88.778344+ / * + *
+    Calculated result: 5.22895e+07
+\end{lstlisting}
+
+测试结果均正确，所有非法表达式均输出了非法原因和 “Invalid” 标志；所有合法表达式均列出对应的后缀表达式和计算结果。
+由于我的测试中有随机生成的表达式，因此每次运行的结果会不一样。
+
+我用 valgrind 进行测试，发现没有发生内存泄露。
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 
